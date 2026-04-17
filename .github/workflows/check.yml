@@ -1,0 +1,20 @@
+name: Check
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Check
+    runs-on: ubuntu-slim
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Lint
+        uses: arduino/arduino-lint-action@v2
+        with:
+          path: ./Inspector/
+          compliance: strict

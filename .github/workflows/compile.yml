@@ -1,0 +1,27 @@
+name: Compile
+
+on:
+  push:
+    paths: ["Inspector/*"]
+  pull_request:
+    paths: ["Inspector/*"]
+  workflow_dispatch:
+
+jobs:
+  compile:
+    name: Compile
+    runs-on: ubuntu-slim
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Compile
+        uses: arduino/compile-sketches@v1
+        with:
+          fqbn: "arduino:avr:mega"
+          libraries: |
+            - name: Servo
+              version: 1.2.2
+          sketch-paths: "Inspector"
