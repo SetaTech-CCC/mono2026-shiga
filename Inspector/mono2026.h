@@ -1,5 +1,5 @@
 /*
-  Copyright 2025 Syuugo
+  Copyright 2026 Syuugo
   
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -10,6 +10,73 @@
   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
   See the License for the specific language governing permissions and
   limitations under the License.
+ */
+
+/*
+ *  関数の説明
+ *
+ * ・secs()
+ *   経過時間を秒単位で返す。小数第一位まで対応。
+ * 
+ * ・delaySecs(time)
+ *   秒単位で遅延させる。小数第一位まで対応。
+ * 
+ * ・stepper(reverse)
+ *   ステッピングモーター制御関数
+ *   3°ずつ動く。
+ *   引数なしでは時計回りに動く。
+ *   引数の reverse を true にすると、反時計回りに動く。
+ * 
+ * ・dc(action, fast)
+ *   DCモーターを制御する。
+ *   action には、RT(Right Turn：右回り)、LT(Left Turn：左回り)、S(Stop：即停止)、F(Free：減速)がある。
+ *   aciton の文字にダブルクォーテーションは不要。
+ *   fast を false にすると、回転速度が遅くなる。
+ * 
+ * ・buzz(level, duration)
+ *   ブザー鳴動関数。
+ *   level は周波数で、HI(高音)、MI(中音)、LO(低音)がある。
+ *   これらにダブルクォーテーションは不要。
+ +   特定の周波数を数値で直接入れることも可能。
+ *   音の長さは２つ目の引数である duration に秒数で入れる。小数第一位まで対応。
+ * 
+ * ・seg(left, center, right)
+ *   7セグ制御関数。
+ *   以下は引数の例：
+ *   番号：num[8] (0〜9)
+ *   アルファベット：Seg::A (ABCDEFのみ) または num[10] (10〜15で16進数)
+ *   特定のセグ：(L1 + R2 + C3) (L1,L2,C1,C2,C3,R1,R2,DP)
+ *   セグ右下の小数点は DP を使用する。
+ *   消灯は Seg::X を入れる。
+ * 
+ * ・led(color)
+ * 　LED制御関数。
+ * 　color は、R,G,B,W,C,Y,M,K を入れる。
+ * 
+ * ・ledVol(color)
+ * 　半固定抵抗で明るさを同期する版。
+ * 　引数は同じ。
+ *
+ * ・isPhotoEnabled()
+ *   フォトインタラプタが遮断されている間 true を返す。
+ * 
+ * ・isPhotoPassed(rotation)
+ *   羽が引数に指定した回数通過した瞬間 true を返す。
+ * 
+ * ・isToggleEnabled()
+ *   トグルスイッチが上向きの状態なら true を返す。
+ * 
+ * ・isTogglePulled()
+ *   トグルスイッチが上向きになった一瞬のみ true を返す。
+ * 
+ * ・isTactEnabled(side)
+ *   タクトスイッチが押され続けている間は true を返す。
+ *   引数は、LE, RI の２つある。
+ *   引数の文字にダブルクォーテーションは不要。
+ * 
+ * ・isTactPressed(side)
+ *   タクトスイッチが押された一瞬のみ true を返す。
+ *   引数は Enabled 版と同じ。
  */
 
 #ifndef MONO2026_H
@@ -32,18 +99,18 @@ const byte SRCLK_PIN = 6;  // CN1-6
 const byte SER_PIN = 7;    // CN1-7
 const byte RCLK_PIN = 8;   // CN1-8
 // ステッピングモーター
-const byte STEPPER_1_PIN = 0;  // CN4-2
-const byte STEPPER_2_PIN = 0;  // CN4-3
-const byte STEPPER_3_PIN = 0;  // CN4-4
-const byte STEPPER_4_PIN = 0;  // CN4-5
+const byte STEPPER_1_PIN = 30;  // CN4-2
+const byte STEPPER_2_PIN = 31;  // CN4-3
+const byte STEPPER_3_PIN = 32;  // CN4-4
+const byte STEPPER_4_PIN = 33;  // CN4-5
 // DCモーター
-const byte DC_1_PIN = 0;  // CN4-6
-const byte DC_2_PIN = 0;  // CN4-7
+const byte DC_1_PIN = 10;  // CN4-6
+const byte DC_2_PIN = 11;  // CN4-7
 // 出力ピン
 const byte PIN_WRITE[] = { LED_G_PIN, LED_B_PIN, LED_R_PIN, BUZZER_PIN, SRCLK_PIN, SER_PIN, RCLK_PIN, STEPPER_1_PIN, STEPPER_2_PIN, STEPPER_3_PIN, STEPPER_4_PIN, DC_1_PIN, DC_2_PIN };
 
 // フォトインタラプタ
-const byte PHOTO_INTERRUPTER_PIN = 0;  // CN4-9
+const byte PHOTO_INTERRUPTER_PIN = 40;  // CN4-9
 // タクトスイッチ
 const byte TACT_LEFT_PIN = 49;
 const byte TACT_RIGHT_PIN = 51;
@@ -53,6 +120,21 @@ const byte TOGGLE_PIN = 53;
 const byte POTENTIOMETER_PIN = A15;
 // 入力ピン
 const byte PIN_READ[] = { PHOTO_INTERRUPTER_PIN, TACT_LEFT_PIN, TACT_RIGHT_PIN, POTENTIOMETER_PIN };
+
+
+/***********
+ * 補助関数 *
+ ***********/
+
+// 秒数計算
+inline float secs() {
+  return millis() / 1000.0f;
+}
+
+// 秒単位で遅延
+inline void delaySecs(const float time) {
+  delay((unsigned long) (time * 1000.0f));
+}
 
 /***************
  * 処理ここから *
@@ -87,10 +169,12 @@ void stepper(const boolean reverse = false) {
 // DCモーターの動作モードを定義する列挙型
 enum DC { LT, RT, S, F };
 // DC モーター制御
-void dc(const DC action = S) {
+void dc(const DC action = S, const boolean fast = true) {
+  // 速度調整
+  uint8_t power =(action == S) ? 0 : (fast ? 255 : 63);
   // ２ピンを４パターンで制御
-  digitalWrite(DC_1_PIN, (action == LT || action == S));
-  digitalWrite(DC_2_PIN, (action == RT || action == S));
+  analogWrite(DC_1_PIN, (action == LT || action == S) ? power : 0);
+  analogWrite(DC_2_PIN, (action == RT || action == S) ? power : 0);
 }
 
 /**********
@@ -109,7 +193,7 @@ const word BUZZ_FREQ[] = {
 void buzz(const word level = LO, const float duration = 0.0f) {
   if (duration > 0.0f) {
     // 鳴動
-    tone(BUZZER_PIN, level > 2 ? level : BUZZ_FREQ[level], (unsigned long)(duration * 1000.0f));
+    tone(BUZZER_PIN, level > 2 ? level : BUZZ_FREQ[level], (unsigned long) (duration * 1000.0f));
   } else {
     // 消音
     noTone(BUZZER_PIN);
@@ -136,9 +220,15 @@ const Color M = (Color) (R | B);
 const Color K = (Color) 0;
 
 // LED 制御関数
-void led(const Color color = 0) {
+void led(const Color color = K) {
   for (const auto& rgb : rgb_pins)
     digitalWrite(rgb.pin, (color & rgb.color));
+}
+
+// 明るさ同期(半固定抵抗) LED
+void ledVol(const Color color = K) {
+  for (const auto& rgb : rgb_pins)
+    analogWrite(rgb.pin, (color & rgb.color) ? map(analogRead(POTENTIOMETER_PIN), 1023, 0, 0, 255) : 0);
 }
 
 /*********
@@ -161,13 +251,13 @@ const SegPins seg_pins[] = {
 
 // アルファベット
 namespace Seg {
-const Segment A = (Segment) (L1 | L2 | C1 | C2 | R1 | R2);
-const Segment B = (Segment) (L1 | L2 | C2 | C3 | R2);
-const Segment C = (Segment) (L2 | C2 | C3);
-const Segment D = (Segment) (L2 | C2 | C3 | R1 | R2);
-const Segment E = (Segment) (L1 | L2 | C1 | C2 | C3);
-const Segment F = (Segment) (L1 | L2 | C1 | C2);
-const Segment X = (Segment) 0;  // 消灯
+  const Segment A = (Segment) (L1 | L2 | C1 | C2 | R1 | R2);
+  const Segment B = (Segment) (L1 | L2 | C2 | C3 | R2);
+  const Segment C = (Segment) (L2 | C2 | C3);
+  const Segment D = (Segment) (L2 | C2 | C3 | R1 | R2);
+  const Segment E = (Segment) (L1 | L2 | C1 | C2 | C3);
+  const Segment F = (Segment) (L1 | L2 | C1 | C2);
+  const Segment X = (Segment) 0;  // 消灯
 }
 
 // int で直接描写できるように数字のみの配列を用意
@@ -337,7 +427,7 @@ boolean isPhotoPassed(const byte rotation = 1) {
  * 可変抵抗器 *
  *************/
 
-// 可変抵抗器の値を 0 ~ 1023 で取得
+// 可変抵抗器の値を取得
 inline word getPot() {
   return analogRead(POTENTIOMETER_PIN);
 }
@@ -355,6 +445,8 @@ void setup() {
   for (byte i = 0; i < ARRAY_SIZE(PIN_WRITE); i++) pinMode(PIN_WRITE[i], OUTPUT);
   // 入力ピンの割り当て
   for (byte i = 0; i < ARRAY_SIZE(PIN_READ); i++) pinMode(PIN_READ[i], INPUT);
+  // DC モーターを停止
+  dc(S);
   // オプション関数
   start();
 }
