@@ -445,6 +445,8 @@ void setup() {
   for (byte i = 0; i < ARRAY_SIZE(PIN_WRITE); i++) pinMode(PIN_WRITE[i], OUTPUT);
   // 入力ピンの割り当て
   for (byte i = 0; i < ARRAY_SIZE(PIN_READ); i++) pinMode(PIN_READ[i], INPUT);
+  // 7セグを全消灯
+  seg();
   // DC モーターを停止
   dc(S);
   // オプション関数
