@@ -28,7 +28,7 @@ void motor(const boolean toggle, const boolean right) {
     dc(S);
   }
   if (isPhotoPassed(4 * 3)) {
-    buzz(MI, 0.3);
+    buzz(NOTE_G5, 0.3);
   }
 }
 

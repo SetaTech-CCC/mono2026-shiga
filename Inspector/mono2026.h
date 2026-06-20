@@ -20,6 +20,9 @@
  * 
  * ・delaySecs(time)
  *   秒単位で遅延させる。小数第一位まで対応。
+ *
+ * ・getPot()
+ *   半固定抵抗の値を返す。
  * 
  * ・stepper(reverse)
  *   ステッピングモーター制御関数
@@ -32,10 +35,15 @@
  *   action には、RT(Right Turn：右回り)、LT(Left Turn：左回り)、S(Stop：即停止)、F(Free：減速)がある。
  *   aciton の文字にダブルクォーテーションは不要。
  *   fast を false にすると、回転速度が遅くなる。
+ *
+ * ・dcVol(action, level)
+ *   規定では半固定抵抗で速度を同期する版。
+ *   action の引数は同じ。
+ *   level は、半固定抵抗以外で PWM 制御を行いたいときに使用。
  * 
  * ・buzz(level, duration)
  *   ブザー鳴動関数。
- *   level は周波数で、HI(高音)、MI(中音)、LO(低音)がある。
+ *   level は周波数で、定義を要確認。ドレミを入れる。
  *   これらにダブルクォーテーションは不要。
  +   特定の周波数を数値で直接入れることも可能。
  *   音の長さは２つ目の引数である duration に秒数で入れる。小数第一位まで対応。
@@ -50,12 +58,13 @@
  *   消灯は Seg::X を入れる。
  * 
  * ・led(color)
- * 　LED制御関数。
- * 　color は、R,G,B,W,C,Y,M,K を入れる。
+ *   LED制御関数。
+ *   color は、R,G,B,W,C,Y,M,K を入れる。
  * 
- * ・ledVol(color)
- * 　半固定抵抗で明るさを同期する版。
- * 　引数は同じ。
+ * ・ledVol(color, level)
+ *   規定では半固定抵抗で明るさを同期する版。
+ *   color の引数は同じ。
+ *   level は、半固定抵抗以外で PWM 制御を行いたいときに使用。
  *
  * ・isPhotoEnabled()
  *   フォトインタラプタが遮断されている間 true を返す。
@@ -139,7 +148,15 @@ inline void delaySecs(const float time) {
 /***************
  * 処理ここから *
  ***************/
+ 
+/*************
+ * 可変抵抗器 *
+ *************/
 
+// 可変抵抗器の値を取得（値は反転）
+inline word getPot() {
+  return map(analogRead(POTENTIOMETER_PIN), 1023, 0, 0, 1023);
+}
 /**********************
  * ステッピングモーター *
  **********************/
@@ -177,23 +194,53 @@ void dc(const DC action = S, const boolean fast = true) {
   analogWrite(DC_2_PIN, (action == RT || action == S) ? power : 0);
 }
 
+// 速度同期(PWM) DC モーター
+void dcVol(const DC action = S, const byte level = map(getPot(), 0, 1023, 0, 255)) {
+  // ２ピンを４パターンで制御
+  analogWrite(DC_1_PIN, (action == LT || action == S) ? constrain(level, 0, 255) : 0);
+  analogWrite(DC_2_PIN, (action == RT || action == S) ? constrain(level, 0, 255) : 0);
+}
+
 /**********
  * ブザー *
  **********/
 
-// ブザーの音の種類を定義する列挙型
-enum BuzzerTone { LO, MI, HI };
-// 型と値を同期
-const word BUZZ_FREQ[] = {
-  /* 低音 */ 400,
-  /* 中音 */ 800,
-  /* 高音 */ 1200
-};
+// 音階
+const word NOTE_C4  = 262; // ド
+const word NOTE_CS4 = 277;
+const word NOTE_D4  = 294; // レ
+const word NOTE_DS4 = 311;
+const word NOTE_E4  = 330; // ミ
+const word NOTE_F4  = 349; // ファ
+const word NOTE_FS4 = 370;
+const word NOTE_G4  = 392; // ソ（低音目安）
+const word NOTE_GS4 = 415;
+const word NOTE_A4  = 440; // ラ
+const word NOTE_AS4 = 466;
+const word NOTE_B4  = 494; // シ
+const word NOTE_C5  = 523;
+const word NOTE_CS5 = 554;
+const word NOTE_D5  = 587;
+const word NOTE_DS5 = 622;
+const word NOTE_E5  = 659;
+const word NOTE_F5  = 698;
+const word NOTE_FS5 = 740;
+const word NOTE_G5  = 784; // （中音目安）
+const word NOTE_GS5 = 831;
+const word NOTE_A5  = 880;
+const word NOTE_AS5 = 932;
+const word NOTE_B5  = 988;
+const word NOTE_C6  = 1047;
+const word NOTE_CS6 = 1109;
+const word NOTE_D6  = 1175; // （高音目安）
+const word NOTE_DS6 = 1245;
+const word NOTE_E6  = 1319;
+
 // ブザー鳴動制御
-void buzz(const word level = LO, const float duration = 0.0f) {
+void buzz(const word level = NOTE_G4, const float duration = 0.0f) {
   if (duration > 0.0f) {
     // 鳴動
-    tone(BUZZER_PIN, level > 2 ? level : BUZZ_FREQ[level], (unsigned long) (duration * 1000.0f));
+    tone(BUZZER_PIN, level, (unsigned long) (duration * 1000.0f));
   } else {
     // 消音
     noTone(BUZZER_PIN);
@@ -225,10 +272,10 @@ void led(const Color color = K) {
     digitalWrite(rgb.pin, (color & rgb.color));
 }
 
-// 明るさ同期(半固定抵抗) LED
-void ledVol(const Color color = K) {
+// 明るさ同期(PWM) LED
+void ledVol(const Color color = K, const byte level = map(getPot(), 0, 1023, 0, 255)) {
   for (const auto& rgb : rgb_pins)
-    analogWrite(rgb.pin, (color & rgb.color) ? map(analogRead(POTENTIOMETER_PIN), 1023, 0, 0, 255) : 0);
+    analogWrite(rgb.pin, (color & rgb.color) ? constrain(level, 0, 255) : 0);
 }
 
 /*********
@@ -305,17 +352,18 @@ inline boolean isToggleEnabled() {
 }
 
 // トグルスイッチが上げられた時に true
+// 物理的に誤作動が半端ないので非推奨
 boolean isTogglePulled() {
   // トグルの状態保持用
   static boolean toggle = true;
   // 現在の状態を取得
-  boolean currently_enabled = isToggleEnabled();
+  boolean current = isToggleEnabled();
   // トグルの状態を参照し更新
-  if (currently_enabled && toggle) {
+  if (current && toggle) {
     // 上げられたので状態を更新
     toggle = false;
     return true;
-  } else if (!currently_enabled) {
+  } else if (!current) {
     // 下げられたので状態をリセット
     toggle = true;
     return false;
@@ -330,42 +378,42 @@ boolean isTogglePulled() {
  *****************/
 
 // タクトスイッチの左右を識別する列挙型
-enum TactSwitch { LE, RI };
+enum Tact { LE, RI };
 // タクトスイッチの全ピン（列挙型変数に対応）
 const byte TACT_PINS[] = { TACT_LEFT_PIN, TACT_RIGHT_PIN };
 
 // 指定された側のタクトスイッチが押され続けている時は true
-boolean isTactEnabled(const TactSwitch side) {
+boolean isTactEnabled(const Tact side) {
   return digitalRead(TACT_PINS[side]);
 }
 
 // 指定された側のタクトスイッチが１回押された時に true
-boolean isTactPressed(const TactSwitch side) {
+boolean isTactPressed(const Tact side) {
   // 初回呼び出しフラグ
   static boolean initialized[2] = { false, false };
   // 前回の状態
-  static boolean prev_state[2] = { LOW, LOW };
+  static boolean prev[2] = { LOW, LOW };
   // 最後に状態が変化した時刻
-  static unsigned long last_changed[2] = { 0, 0 };
+  static unsigned long last[2] = { 0, 0 };
   // 現在の状態を取得
-  boolean currently_enabled = isTactEnabled(side);
+  boolean current = isTactEnabled(side);
   // 初回は現在の状態を基準として設定し、誤検知を防ぐ
   if (!initialized[side]) {
     // 現在の状態を初期値として記録
-    prev_state[side] = currently_enabled;
+    prev[side] = current;
     // 初期化完了
     initialized[side] = true;
     // 初回は押下とみなさない
     return false;
   }
-  // 状態が変化、かつ前回の変化から <-- 20ms --> 以上経過している場合のみ有効          ↓
-  if (currently_enabled != prev_state[side] && (millis() - last_changed[side]) > 20) {
+  // 状態が変化、かつ前回の変化から <-- 20ms --> 以上経過している場合のみ有効
+  if (current != prev[side] && (millis() - last[side]) > 20) {
     // 変化時刻を更新
-    last_changed[side] = millis();
+    last[side] = millis();
     // 状態を更新
-    prev_state[side] = currently_enabled;
+    prev[side] = current;
     // 押下なら true、離放なら false
-    return currently_enabled;
+    return current;
   }
   // 変化なし、またはチャタリング
   return false;
@@ -383,27 +431,27 @@ inline boolean isPhotoEnabled() {
 // フォトインタラプタの羽が指定回数通過した瞬間に true
 boolean isPhotoPassed(const byte rotation = 1) {
   // 瞬間検知のための状態保持フラグ
-  static boolean photo_state = false;
+  static boolean state = false;
   // 通過回数カウンター
-  static byte photo_passed_count = 0;
+  static byte count = 0;
   // 羽が1枚通過した瞬間かを判定
-  boolean one_rotate = false;
+  boolean rotate = false;
   // 現在の遮光状態を一度だけ読み取る
-  boolean currently_enabled = isPhotoEnabled();
+  boolean current = isPhotoEnabled();
   // 通過の瞬間を検知
-  if (!photo_state && currently_enabled) {
+  if (!state && current) {
     // 状態を検知済みに更新
-    photo_state = true;
+    state = true;
     // 1回通過したと判定
-    one_rotate = true;
+    rotate = true;
   }
   // 状態をリセット
-  else if (!currently_enabled) {
+  else if (!current) {
     // 状態を未検知にリセット
-    photo_state = false;
+    state = false;
   }
   // 1回通過を検知した場合のみ回数判断へ
-  if (!one_rotate) {
+  if (!rotate) {
     return false;
   }
   // 1回通過が検知された場合
@@ -412,24 +460,15 @@ boolean isPhotoPassed(const byte rotation = 1) {
     return true;
   } else {
     // 目標が複数回なら、カウンター処理を行う
-    photo_passed_count++;
-    if (photo_passed_count >= rotation) {
-      photo_passed_count = 0;
+    count++;
+    if (count >= rotation) {
+      count = 0;
       // 目標回数に到達した
       return true;
     }
   }
   // 目標回数に達していない場合は false
   return false;
-}
-
-/*************
- * 可変抵抗器 *
- *************/
-
-// 可変抵抗器の値を取得
-inline word getPot() {
-  return analogRead(POTENTIOMETER_PIN);
 }
 
 /***********
