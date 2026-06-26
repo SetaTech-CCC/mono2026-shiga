@@ -237,8 +237,8 @@ const word NOTE_DS6 = 1245;
 const word NOTE_E6  = 1319;
 
 // ブザー鳴動制御
-void buzz(const word level = NOTE_G4, const float duration = 0.0f) {
-  if (duration > 0.0f) {
+void buzz(const word level = 0, const float duration = 0.0f) {
+  if (level <= 0 || duration > 0.0f) {
     // 鳴動
     tone(BUZZER_PIN, level, (unsigned long) (duration * 1000.0f));
   } else {
@@ -349,28 +349,6 @@ void seg(const Segment left = Seg::X, const Segment center = Seg::X, const Segme
 // トグルスイッチが奥側の時は true
 inline boolean isToggleEnabled() {
   return digitalRead(TOGGLE_PIN) == HIGH;
-}
-
-// トグルスイッチが上げられた時に true
-// 物理的に誤作動が半端ないので非推奨
-boolean isTogglePulled() {
-  // トグルの状態保持用
-  static boolean toggle = true;
-  // 現在の状態を取得
-  boolean current = isToggleEnabled();
-  // トグルの状態を参照し更新
-  if (current && toggle) {
-    // 上げられたので状態を更新
-    toggle = false;
-    return true;
-  } else if (!current) {
-    // 下げられたので状態をリセット
-    toggle = true;
-    return false;
-  } else {
-    // 上げられているが無視
-    return false;
-  }
 }
 
 /*****************
@@ -487,7 +465,9 @@ void setup() {
   // 7セグを全消灯
   seg();
   // DC モーターを停止
-  dc(S);
+  dc();
+  // ブザー消音
+  buzz();
   // オプション関数
   start();
 }
