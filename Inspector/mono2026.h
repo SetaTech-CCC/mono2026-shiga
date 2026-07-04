@@ -88,8 +88,7 @@
  *   引数は Enabled 版と同じ。
  */
 
-#ifndef MONO2026_H
-#define MONO2026_H
+#pragma once
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
@@ -471,5 +470,3 @@ void setup() {
   // オプション関数
   start();
 }
-
-#endif  // MONO2026_H
